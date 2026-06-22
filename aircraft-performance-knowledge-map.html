@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aircraft Performance — Knowledge Map</title>
+<meta name="description" content="An interactive five-layer knowledge map of aircraft performance, built the way the dependency graph actually works.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<style>
+:root{
+  --bg:#040B14;
+  --atmosphere:#0A1525;
+  --amber:#F2A93B;
+  --chalk:#EAF7FF;
+  --muted:#6E89A3;
+  --work:#6EF5A5;
+  --cyan:#7DF9FF;
+  --cyan2:#5DAEFF;
+  --panel:#0A1525CC;
+  --line:#1C3349;
+  --max:1180px;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto;} *{animation:none!important;transition:none!important;}}
+body{
+  margin:0;
+  background:
+    radial-gradient(ellipse 1200px 800px at 50% -10%,#102136 0%,transparent 60%),
+    radial-gradient(ellipse 900px 700px at 90% 110%,#0c1d2e 0%,transparent 55%),
+    var(--bg);
+  color:var(--chalk);
+  font-family:'IBM Plex Sans',sans-serif;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--amber);color:var(--bg);}
+a{color:var(--amber);}
+
+#starfield{position:fixed;inset:0;width:100%;height:100%;z-index:-2;pointer-events:none;}
+#spotlight{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(560px circle at var(--mx,50%) var(--my,30%),#7DF9FF10,transparent 70%);transition:opacity .4s;}
+
+.drift{position:fixed;pointer-events:none;z-index:-1;opacity:.06;stroke:var(--cyan);fill:none;}
+@keyframes driftA{0%{transform:translate(0,0) rotate(0deg);}50%{transform:translate(30px,-20px) rotate(8deg);}100%{transform:translate(0,0) rotate(0deg);}}
+@keyframes driftB{0%{transform:translate(0,0) rotate(0deg);}50%{transform:translate(-25px,25px) rotate(-6deg);}100%{transform:translate(0,0) rotate(0deg);}}
+@keyframes driftC{0%{transform:translateY(0) rotate(0deg);}100%{transform:translateY(-18px) rotate(360deg);}}
+
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);}
+h1,h2,h3{font-family:'Big Shoulders Display',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:.01em;margin:0;}
+
+/* ---- NAV DOTS ---- */
+.navdots{position:fixed;right:18px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:14px;z-index:50;}
+.navdots button{width:11px;height:11px;border-radius:2px;border:1px solid var(--muted);background:transparent;cursor:pointer;padding:0;transition:background .2s,border-color .2s,transform .2s;}
+.navdots button.active{background:var(--amber);border-color:var(--amber);transform:scale(1.25);}
+.navdots button:focus-visible{outline:2px solid var(--amber);outline-offset:3px;}
+@media(max-width:780px){.navdots{display:none;}}
+
+/* ---- HERO ---- */
+.hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;padding:40px 20px 80px;text-align:center;overflow:hidden;}
+
+/* Energy State Diagram */
+.energy-stage{
+  position:relative;
+  width:min(58vw,380px);
+  aspect-ratio:1/1;
+  margin-bottom:40px;
+  display:flex;align-items:center;justify-content:center;
+}
+.energy-canvas-wrap{position:relative;width:100%;height:100%;}
+#energyCanvas{display:block;width:100%;height:100%;cursor:crosshair;}
+.hud{
+  position:absolute;left:50%;bottom:-32px;transform:translateX(-50%);
+  display:flex;gap:20px;
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;letter-spacing:.08em;
+  color:var(--cyan2);white-space:nowrap;opacity:.8;
+}
+.hud span b{color:var(--chalk);font-weight:500;}
+
+.hero h1{font-size:clamp(2.4rem,7vw,4.6rem);line-height:.95;color:var(--chalk);}
+.hero h1 span{color:var(--amber);text-shadow:0 0 30px #F2A93B55;}
+.hero p.lede{max-width:480px;color:var(--muted);font-size:1rem;margin-top:14px;}
+.hero .eyebrow{margin-bottom:10px;}
+.scrollcue{margin-top:60px;font-family:'IBM Plex Mono',monospace;font-size:.7rem;letter-spacing:.14em;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:8px;}
+.scrollcue .stick{width:1px;height:28px;background:var(--muted);position:relative;overflow:hidden;}
+.scrollcue .stick::after{content:'';position:absolute;left:-1px;top:-100%;width:3px;height:50%;background:var(--amber);animation:fall 1.6s ease-in-out infinite;}
+@keyframes fall{to{top:100%;}}
+
+/* ---- INTRO STRIP ---- */
+.intro{max-width:var(--max);margin:0 auto;padding:40px 24px 80px;color:var(--muted);font-size:.95rem;border-top:1px solid var(--line);}
+.intro strong{color:var(--chalk);font-weight:500;}
+.legend{display:flex;gap:22px;flex-wrap:wrap;margin-top:18px;font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--muted);}
+.legend span{display:inline-flex;align-items:center;gap:7px;}
+.legend i{width:14px;height:2px;display:inline-block;}
+.legend i.solid{background:var(--cyan);}
+.legend i.dash{background:repeating-linear-gradient(90deg,var(--work) 0 4px,transparent 4px 7px);}
+.legend i.dot{width:7px;height:7px;border-radius:50%;background:var(--work);}
+.legend i.crit{background:var(--amber);box-shadow:0 0 6px 1px var(--amber);}
+
+/* ---- LAYER SECTIONS ---- */
+.layer{max-width:var(--max);margin:0 auto;padding:90px 24px 40px;scroll-margin-top:20px;}
+.layer-head{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:14px;}
+.layer-num{font-family:'Big Shoulders Display',sans-serif;font-weight:900;font-size:3.2rem;color:var(--line);line-height:1;}
+.layer-head h2{font-size:clamp(1.5rem,3.4vw,2.3rem);color:var(--chalk);}
+.layer-sub{font-family:'IBM Plex Mono',monospace;font-size:.78rem;color:var(--muted);margin-top:6px;max-width:62ch;}
+
+.schematic{position:relative;margin-top:46px;}
+.schematic svg.connectors{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.schematic svg.connectors path{stroke-dasharray:6 5;animation:pulse 2.6s linear infinite;}
+.schematic svg.connectors path.applied{stroke-dasharray:4 4;}
+.schematic svg.connectors path.lit{stroke:var(--amber)!important;stroke-width:2!important;opacity:.95!important;filter:drop-shadow(0 0 4px #F2A93B90);animation:pulseLit 1.4s linear infinite;}
+@keyframes pulse{to{stroke-dashoffset:-44;}}
+@keyframes pulseLit{to{stroke-dashoffset:-44;}}
+
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 22px;position:relative;z-index:2;}
+
+.node{
+  background:linear-gradient(160deg,#0B1C2D,#081420);
+  border:1px solid var(--line);
+  border-radius:4px;
+  padding:13px 14px;
+  text-align:left;
+  cursor:pointer;
+  color:var(--chalk);
+  font-family:'IBM Plex Sans',sans-serif;
+  transition:border-color .2s,transform .2s,box-shadow .2s,background .2s;
+  position:relative;
+  animation:idleFloat 6s ease-in-out infinite;
+  animation-delay:calc(var(--i,0) * .35s);
+  box-shadow:0 0 0 0 transparent;
+}
+@keyframes idleFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-3px);}}
+.node:hover{border-color:var(--cyan);transform:translateY(-5px) scale(1.015);box-shadow:0 14px 30px -14px #000a,0 0 22px -4px #7DF9FF55;animation-play-state:paused;z-index:5;}
+.node:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+.node.active{border-color:var(--amber);background:linear-gradient(160deg,#16283b,#0c1c2b);box-shadow:0 0 0 1px #F2A93B55,0 0 28px -6px #F2A93B70;animation-play-state:paused;}
+.node.lit:not(.active){border-color:var(--amber);box-shadow:0 0 18px -6px #F2A93B80;}
+
+.node .label{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:.78rem;letter-spacing:.02em;color:var(--chalk);display:block;}
+.node .sub{font-size:.74rem;color:var(--muted);margin-top:3px;display:block;}
+.node .workdot{position:absolute;top:9px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--work);box-shadow:0 0 7px 1px #6EF5A5aa;}
+
+/* ---- DETAIL PANEL ---- */
+.detail{
+  grid-column:1/-1;
+  background:linear-gradient(160deg,#0B1C2D,#081420);
+  border:1px solid var(--amber);
+  border-radius:4px;
+  padding:20px 22px;
+  margin-top:4px;
+  display:none;
+  box-shadow:0 0 40px -10px #F2A93B40;
+  animation:reveal .3s ease;
+}
+.detail.show{display:block;}
+@keyframes reveal{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+.detail .dtitle{font-family:'IBM Plex Mono',monospace;font-size:.82rem;font-weight:600;color:var(--amber);margin-bottom:8px;}
+.detail p{margin:0 0 10px;font-size:.92rem;color:var(--chalk);}
+.detail .formula{font-family:'IBM Plex Mono',monospace;font-size:.82rem;background:#040C16;border:1px solid var(--line);border-radius:3px;padding:10px 12px;color:var(--amber);overflow-x:auto;margin-bottom:10px;transition:box-shadow .25s,transform .25s;}
+.detail .formula:hover{box-shadow:0 0 26px -6px #F2A93B70;transform:scale(1.01);}
+.detail .workbadge{font-family:'IBM Plex Mono',monospace;font-size:.7rem;color:var(--work);display:inline-flex;align-items:center;gap:6px;}
+.detail .workbadge::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--work);box-shadow:0 0 6px 1px #6EF5A5aa;}
+.detail .extra{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;}
+.detail .extra-item{font-size:.8rem;color:var(--muted);}
+.detail .extra-item b{color:var(--chalk);font-weight:500;display:block;font-size:.75rem;font-family:'IBM Plex Mono',monospace;margin-bottom:2px;letter-spacing:.04em;}
+
+.node .label .katex{color:var(--chalk);font-size:1.05em;}
+.dtitle .katex{color:var(--amber);font-size:1.1em;}
+.formula .katex{color:var(--amber);}
+.formula .katex-display{margin:0;}
+
+@media(max-width:780px){
+  .grid{grid-template-columns:1fr;}
+  .node{grid-column:auto!important;grid-row:auto!important;}
+  .schematic svg.connectors{display:none;}
+}
+
+footer{max-width:var(--max);margin:0 auto;padding:70px 24px 60px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:18px;}
+footer .name{font-family:'Big Shoulders Display';font-weight:700;font-size:1.3rem;color:var(--chalk);text-transform:uppercase;}
+footer a{margin-right:16px;}
+</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+<div id="spotlight"></div>
+
+<svg class="drift" style="top:10%;left:3%;width:130px;height:130px;animation:driftA 28s ease-in-out infinite;" viewBox="0 0 100 100"><path d="M10 80 L50 20 L90 80 Z"/><line x1="50" y1="20" x2="50" y2="80"/><line x1="10" y1="60" x2="90" y2="60"/></svg>
+<svg class="drift" style="top:52%;right:5%;width:160px;height:80px;animation:driftB 34s ease-in-out infinite;" viewBox="0 0 200 100"><path d="M2 50 Q50 5 100 50 Q150 95 198 50"/><line x1="2" y1="50" x2="198" y2="50" stroke-dasharray="3 6" opacity=".5"/></svg>
+<svg class="drift" style="top:25%;right:12%;width:90px;height:90px;animation:driftC 44s linear infinite;" viewBox="0 0 100 100"><rect x="20" y="20" width="60" height="60" rx="3"/><circle cx="50" cy="50" r="16"/><line x1="50" y1="4" x2="50" y2="20"/><line x1="50" y1="80" x2="50" y2="96"/></svg>
+<svg class="drift" style="top:72%;left:8%;width:110px;height:55px;animation:driftA 30s ease-in-out infinite reverse;" viewBox="0 0 160 70"><path d="M0 35 L40 10 L120 10 L160 35 L120 60 L40 60 Z" stroke-dasharray="3 5"/></svg>
+
+<nav class="navdots" id="navdots" aria-label="Layer navigation"></nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="eyebrow">A Learning Artifact</div>
+  <div class="energy-stage">
+    <div class="energy-canvas-wrap">
+      <canvas id="energyCanvas" width="380" height="380"></canvas>
+    </div>
+    <div class="hud">
+      <span>PE <b id="hudPE">50</b>%</span>
+      <span>KE <b id="hudKE">50</b>%</span>
+      <span>TE <b id="hudTE">100</b>%</span>
+    </div>
+  </div>
+  <h1>Aircraft<br><span>Performance</span></h1>
+  <p class="lede">A five-layer dependency map — from forces and equilibrium, through excess power, to the operational and high-speed limits that govern every flight. Move your cursor over the diagram. Scroll to descend.</p>
+  <div class="scrollcue"><span>DESCEND</span><div class="stick"></div></div>
+</section>
+
+<div class="intro">
+  <p><strong>How this map is built:</strong> each layer only makes sense once the layer above it is solid — this is a dependency graph, not a glossary. Click any node to expand it. Nodes marked with a green dot connect directly to operational or certification work, not just theory.</p>
+  <div class="legend">
+    <span><i class="solid"></i> derives / feeds into</span>
+    <span><i class="dash"></i> applied connection</span>
+    <span><i class="dot"></i> ties to real engineering work</span>
+    <span><i class="crit"></i> active dependency chain (click a node)</span>
+  </div>
+</div>
+
+<main id="layers"></main>
+
+<footer>
+  <div>
+    <div class="name">Dhruv Arora</div>
+    <div>Flight Physics Capabilities | Engineering Automation | Solution Developer | Aeronautical Engineer</div>
+  </div>
+  <div>
+    <a href="https://www.linkedin.com/in/dhruvarora-7a785a159/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://www.behance.net/thenovicedesigner" target="_blank" rel="noopener">Behance</a>
+    <a href="https://github.com/dxarora" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</footer>
+
+<script>
+/* ===== DATA ===== */
+const LAYERS = [
+{
+  id:'l1', num:'01', title:'Forces & Equilibrium',
+  sub:'Before any performance can be discussed, the aircraft must be flying. Four forces in balance define the null state — every performance deviation is measured from here.',
+  nodes:[
+    {id:'lift',   label:'LIFT',         sub:'½ρV²SC_L',        r:1,c:'1/2', tag:'',
+     math:'L', formula:'L = \\tfrac{1}{2}\\rho V^2 S C_L',
+     detail:'Aerodynamic force perpendicular to the flight path. The wing deflects airflow downward; Newton\'s third law pushes the aircraft up. Lift is the mechanism that converts forward motion into sustained flight.',
+     mistake:'Assuming L = W always. This equality only holds in unaccelerated level flight — not in climbs, descents, or turns.',
+     interview:'If an aircraft banks 60° in a coordinated turn at constant altitude, by how much does lift increase and why?'},
+    {id:'drag',   label:'DRAG',         sub:'D_i + D_p',        r:1,c:'2/3', tag:'',
+     formula:'D = \\tfrac{1}{2}\\rho V^2 S C_D',
+     detail:'Aerodynamic force opposing motion. Induced drag decreases with V²; parasite drag increases with V². Their sum produces the characteristic U-shaped drag curve — the backbone of every performance diagram.',
+     mistake:'Treating drag as a single entity. The two components behave oppositely with speed, which is why there is a minimum-drag speed.',
+     interview:'How does drag change when an aircraft climbs at constant indicated airspeed?'},
+    {id:'weight', label:'WEIGHT',        sub:'mg — always downward',r:1,c:'3/4', tag:'',
+     formula:'W = mg',
+     detail:'The only force that never stops. Every performance metric — takeoff distance, ceiling, range, climb rate — degrades as weight increases. As fuel burns, weight decreases; smart operations exploit this continuously.',
+     mistake:'Treating weight as constant through a flight. A long-haul aircraft may burn 40% of its gross weight in fuel — the aircraft in cruise is fundamentally different from the aircraft at brake release.',
+     interview:'An aircraft burns 10 t of fuel on a long sector. How does this change optimum cruise altitude?'},
+    {id:'thrust', label:'THRUST',        sub:'T = ṁ(V_e − V₀)',  r:1,c:'4/5', tag:'',
+     formula:'T = \\dot{m}(V_e - V_0)',
+     detail:'Propulsive force from the engine. Thrust available decreases with altitude as air density falls. The gap between thrust available and thrust required is the single source of all climb and acceleration capability.',
+     mistake:'Confusing thrust and power. Thrust is force. Power is force × velocity. High thrust at low speed ≠ high power.',
+     interview:'Why does available thrust decrease with altitude, and what happens to the thrust required curve?'},
+    {id:'lvlflt', label:'LEVEL FLIGHT',  sub:'L = W,  T = D',    r:2,c:'2/4', tag:'',
+     formula:'L = W \\qquad T = D',
+     detail:'The baseline. Steady level unaccelerated flight is the reference state for all performance analysis. All performance metrics are either deviations from or conditions derived from this equilibrium.',
+     mistake:'Thinking level flight means zero performance effort. The aircraft is working constantly — just at equilibrium. Excess is what enables everything else.',
+     interview:'What does "steady level flight" actually mean, and why is it the reference point for all performance calculations?'},
+  ],
+  edges:[['lift','lvlflt'],['drag','lvlflt'],['weight','lvlflt'],['thrust','lvlflt']]
+},
+{
+  id:'l2', num:'02', title:'Energy & Performance Foundations',
+  sub:'What allows the aircraft to do more than maintain level flight? Excess — thrust or power above equilibrium — is the origin of every performance metric that follows. This layer is the heart of the map.',
+  nodes:[
+    {id:'treq',  label:'THRUST REQUIRED',  sub:'= drag curve',         r:1,c:'1/3', tag:'',
+     formula:'T_{req} = D = \\tfrac{1}{2}\\rho V^2 S C_D',
+     detail:'At each airspeed, thrust required equals drag. The shape of this curve determines minimum-drag speed, best L/D, and every performance-optimal speed. The minimum occurs at (L/D)_max.',
+     mistake:'Confusing thrust required with power required. They share the same minimum-drag point but produce different optimal speeds for other tasks.',
+     interview:'Why does the thrust required curve have a U-shape, and what does each side represent?'},
+    {id:'tavail', label:'THRUST AVAILABLE', sub:'drops with altitude',  r:1,c:'3/5', tag:'',
+     formula:'T_{avail} \\approx T_{SL}\\cdot\\frac{\\rho}{\\rho_0}',
+     detail:'The engine\'s output at a given altitude and throttle. As density falls with altitude, thrust available falls too. The intersection of thrust available and thrust required curves defines maximum level speed and, as they converge, the absolute ceiling.',
+     mistake:'Assuming constant thrust with altitude. Above the tropopause the density gradient changes and so does the thrust lapse rate.',
+     interview:'What two curves intersect to define the absolute ceiling of a jet aircraft?'},
+    {id:'preq',  label:'POWER REQUIRED',   sub:'= drag × velocity',    r:2,c:'1/3', tag:'',
+     formula:'P_{req} = D \\cdot V',
+     detail:'Power required shifts the analysis from force to energy rate. The minimum of the power curve occurs at a speed slower than minimum drag — Vmp < Vmd. This is critical: best endurance speed ≠ best range speed.',
+     mistake:'Assuming minimum power speed = minimum drag speed. They are always different: Vmp ≈ 0.76 × Vmd for a parabolic polar.',
+     interview:'Why is the speed for minimum power required always lower than the speed for minimum drag?'},
+    {id:'pavail', label:'POWER AVAILABLE',  sub:'T × TAS',              r:2,c:'3/5', tag:'',
+     formula:'P_{avail} = T_{avail} \\cdot V',
+     detail:'Power available can initially increase with altitude at constant IAS, because TAS rises even as thrust falls. This makes power analysis more nuanced than thrust analysis across the altitude envelope.',
+     mistake:'Thinking power available always decreases monotonically with altitude at constant IAS. The TAS factor means it is more complex.',
+     interview:'What happens to power available as a jet climbs at constant indicated airspeed?'},
+    {id:'exthrust',label:'EXCESS THRUST',   sub:'T_avail − T_req',      r:3,c:'1/3', tag:'',
+     formula:'\\Delta T = T_{avail} - T_{req}',
+     detail:'The force margin above what level flight demands. Excess thrust determines climb angle — the steepness of the flight path. At best angle of climb speed (Vx), excess thrust is maximized.',
+     mistake:'Using excess thrust to calculate rate of climb. Rate of climb uses excess power; excess thrust gives angle of climb. Confusing the two leads to the wrong speed selection.',
+     interview:'An aircraft has maximum excess thrust at 140 kt. At what speed should it fly for best angle of climb?'},
+    {id:'expow',  label:'EXCESS POWER',     sub:'P_avail − P_req',      r:3,c:'3/5', tag:'work',
+     formula:'P_{ex} = P_{avail} - P_{req} = W \\cdot ROC',
+     detail:'The master variable of Aircraft Performance. Excess power is the energy rate the aircraft possesses beyond what equilibrium demands. It can be converted to altitude gain (rate of climb) or speed increase. Every metric in layers 3–5 traces back to this one quantity.',
+     mistake:'Confusing excess power with excess thrust. They are related but distinct — they lead to different optimal speeds and different performance metrics.',
+     interview:'Derive the relationship between excess power and rate of climb from energy principles. Why does ROC use excess power rather than excess thrust?'},
+  ],
+  edges:[['treq','exthrust'],['tavail','exthrust'],['preq','expow'],['pavail','expow'],['exthrust','expow',1]]
+},
+{
+  id:'l3', num:'03', title:'Performance Modes',
+  sub:'How an aircraft deliberately spends energy. Each mode is a directed allocation of the excess established in Layer 2 toward a defined objective — altitude, distance, time, or turning.',
+  nodes:[
+    {id:'roc',  label:'RATE OF CLIMB',  sub:'excess power / weight',r:1,c:'1/2', tag:'work',
+     formula:'ROC = \\frac{P_{ex}}{W} = V\\sin\\gamma',
+     detail:'The aircraft climbs because it has power beyond what level flight demands. Best rate speed (Vy) is the speed of maximum excess power — always higher than Vx. Determines certification gradients and time-to-climb.',
+     mistake:'Flying Vx (best angle) when you want best rate. Vx maximizes height per distance; Vy maximizes height per time. They serve different purposes.',
+     interview:'Why are Vx and Vy different speeds, and when would you use each?'},
+    {id:'aoc',  label:'ANGLE OF CLIMB', sub:'excess thrust / weight',r:1,c:'2/3',
+     formula:'\\sin\\gamma = \\frac{T-D}{W}',
+     detail:'Steepness of the flight path. Critical for obstacle clearance after takeoff. Best angle of climb (Vx) maximizes height per horizontal distance. SID procedures define minimum required climb gradients that the aircraft must meet.',
+     mistake:'Assuming higher speed always gives better angle. More speed increases parasite drag, reducing excess thrust and therefore angle of climb.',
+     interview:'An SID requires 200 ft/nm gradient. How do you verify the aircraft can comply at the given weight and density altitude?'},
+    {id:'ld',   label:'L/D RATIO',      sub:'aerodynamic efficiency',r:1,c:'3/5',
+     formula:'\\frac{L}{D} = \\frac{C_L}{C_D}',
+     detail:'The single most important aerodynamic efficiency number. Maximum L/D speed is best glide speed and also best range speed for a jet (roughly). It appears directly in the Breguet range equation and governs fuel efficiency across all phases.',
+     mistake:'Thinking L/D is purely a cruise metric. It governs climb, descent, glide, and range equally — it is the aerodynamic efficiency of the whole aircraft.',
+     interview:'Where does maximum L/D appear in the thrust required curve, and why?'},
+    {id:'specrange',label:'SPECIFIC RANGE',sub:'distance per kg fuel',r:2,c:'1/2', tag:'work',
+     formula:'SR = \\frac{V}{\\dot{W}_f} = \\frac{V}{TSFC \\cdot T}',
+     detail:'Nautical miles per kilogram of fuel — the cruise efficiency metric. Speed that maximises SR is maximum range cruise. SR decreases as weight decreases, so the optimal cruise speed and altitude change continuously during a sector.',
+     mistake:'Assuming maximum SR = maximum speed. Higher speed increases drag non-linearly, reducing SR significantly.',
+     interview:'How does specific range change as fuel burns during cruise, and what operational technique exploits this?'},
+    {id:'loadf', label:'LOAD FACTOR',    sub:'L/W — structural multiplier',r:2,c:'2/3', tag:'work',
+     formula:'n = \\frac{L}{W} = \\frac{1}{\\cos\\phi}',
+     detail:'How many g\'s the aircraft is pulling. In a 60° banked turn, n = 2. Load factor increases stall speed by √n. It ties performance directly to structural limits — maneuvering speed Va is defined as the speed at which CLmax is reached at limit load factor.',
+     mistake:'Forgetting that stall speed changes in a turn. At 60° bank, stall speed increases by 41%. The flight envelope changes dynamically with manoeuvre.',
+     interview:'What is the load factor in a 45° coordinated turn, and how does this affect stall speed?'},
+    {id:'glide', label:'GLIDE RATIO',    sub:'= L/D in power-off',   r:2,c:'3/5',
+     formula:'GR = \\frac{L}{D} \\bigg|_{power-off}',
+     detail:'Horizontal distance per unit altitude in power-off glide. Equals L/D. Best glide speed is the minimum-drag speed. Above or below it, range is reduced. Wind correction is critical: headwind demands a higher glide speed.',
+     mistake:'Confusing best glide speed (Vmd, maximises distance) with minimum sink speed (Vmp, maximises time aloft). They serve different emergency scenarios.',
+     interview:'Given a 20 kt headwind, should you fly faster or slower than the published best glide speed, and by how much?'},
+  ],
+  edges:[['expow','roc',1],['exthrust','aoc',1],['roc','specrange'],['ld','specrange'],['ld','glide'],['loadf','roc'],['exthrust','aoc']]
+},
+{
+  id:'l4', num:'04', title:'Operational Performance',
+  sub:'Where theory meets the flight deck, the runway, and the fuel plan. These concepts live in the FCOM, on the PERF pages, and in every dispatcher\'s briefing pack.',
+  nodes:[
+    {id:'tkof',  label:'TAKEOFF PERF',    sub:'ground roll → 35 ft',   r:1,c:'1/3',
+     formula:'TODR \\propto \\frac{W^2}{\\rho\\,S\\,C_L\\,T}',
+     detail:'Three simultaneous constraints govern takeoff: all-engine distance, accelerate-stop distance (ASD), and OEI climb gradient. The most restrictive limits the max takeoff weight. V1, Vr, and V2 are derived from these constraints.',
+     mistake:'Assuming more thrust always helps. Flex/derate reduces thrust intentionally — the runway must be sufficient for the reduced-thrust case.',
+     interview:'Explain the three simultaneous limiting cases for takeoff and which typically governs at MTOW.'},
+    {id:'bfl',   label:'BALANCED FIELD',  sub:'TODR_OEI = ASD at V1',  r:2,c:'1/3', tag:'work',
+     formula:'BFL\\!: TOD_{OEI} = ASD \\text{ at } V_1',
+     detail:'V1 is set such that the distance to stop equals the distance to continue on one engine. This maximises the allowable takeoff weight for a given runway. Airlines spend significant effort optimizing V1 to the specific runway, weight, and environmental conditions.',
+     mistake:'Assuming V1 is always the balanced-field V1. V1 can be reduced for other reasons — the field then becomes stop-limited, not balanced.',
+     interview:'What does a balanced field length mean operationally, and why would an airline optimize V1?'},
+    {id:'oei',   label:'OEI CLIMB',       sub:'≥ 2.4% gradient req',   r:1,c:'3/5', tag:'work',
+     formula:'Grad_{OEI} = \\frac{T_{OEI}-D}{W} \\geq 2.4\\%',
+     detail:'CS-25 / FAR-25 require a minimum 2.4% climb gradient at segment 2 with one engine inoperative. This constraint frequently limits RTOW more severely than runway length alone — especially at high altitude airports or on hot days.',
+     mistake:'Thinking OEI performance only matters if an engine actually fails. It determines maximum permitted takeoff weight for every single departure.',
+     interview:'Why does OEI segment 2 gradient set a harder operational constraint than actual runway length for many airports?'},
+    {id:'svceil', label:'SERVICE CEILING', sub:'ROC = 100 fpm',         r:2,c:'3/5', tag:'work',
+     formula:'H_{svc}\\!: ROC = 100\\,\\text{fpm}',
+     detail:'The altitude at which only 100 fpm of climb remains. Sets the practical upper limit for operations. OEI service ceiling is significantly lower and is critical for ETOPS routing over water or mountainous terrain.',
+     mistake:'Confusing service ceiling with absolute ceiling. Service ceiling is operationally defined and reachable; absolute ceiling (ROC = 0) is theoretical.',
+     interview:'How do weight and temperature affect service ceiling, and why does OEI service ceiling matter for route planning?'},
+    {id:'breguet',label:'BREGUET RANGE',  sub:'V, TSFC, L/D, ln(Wi/Wf)',r:3,c:'1/3', tag:'work',
+     formula:'R = \\frac{V}{g\\cdot TSFC}\\cdot\\frac{L}{D}\\cdot\\ln\\!\\left(\\frac{W_i}{W_f}\\right)',
+     detail:'The analytical range equation. Four levers: speed, engine efficiency (TSFC), aerodynamic efficiency (L/D), and fuel fraction. Every range improvement program traces directly to one of these four terms. A 1% improvement in L/D yields roughly 1% more range.',
+     mistake:'Applying Breguet at constant altitude and speed to an aircraft that is step-climbing. The weight-ratio term must account for the actual flight profile.',
+     interview:'Using the Breguet equation, which single parameter offers the largest potential range improvement and why?'},
+    {id:'plrange',label:'PAYLOAD RANGE',  sub:'the commercial DNA',     r:3,c:'2/4', tag:'work',
+     detail:'Three segments: MTOW-limited (full payload, short range), max-fuel-limited (payload traded for fuel beyond the knee), and ferry range (zero payload). The "knee" of the diagram is the design mission — where max payload meets max fuel volume.',
+     mistake:'Assuming the aircraft can reach published maximum range with maximum payload. This is almost always impossible — payload must be reduced first.',
+     interview:'Walk through the three segments of a transport aircraft payload-range diagram and what physically limits each.'},
+    {id:'ci',    label:'COST INDEX',      sub:'C_time / C_fuel',        r:3,c:'4/5', tag:'work',
+     formula:'CI = \\frac{C_{time}}{C_{fuel}} \\;[\\text{kg/min}]',
+     detail:'CI drives the ECON speed the FMS computes. CI = 0 gives maximum range cruise; CI = 999 gives maximum speed. For most airlines, CI sits between 20 and 80, depending on fuel price and schedule pressure. It is the most direct link between airline economics and aircraft speed.',
+     mistake:'Assuming CI = 0 is always optimal. Time has real cost — crew, ownership, slot constraints. CI = 0 minimises fuel, not total trip cost.',
+     interview:'An airline drops CI from 60 to 20 on all flights. What happens to fuel burn, flight time, and total trip cost?'},
+  ],
+  edges:[['tkof','bfl'],['oei','bfl',1],['roc','svceil',1],['ld','breguet',1],['specrange','breguet',1],['breguet','plrange'],['specrange','ci'],['bfl','plrange'],['svceil','plrange']]
+},
+{
+  id:'l5', num:'05', title:'Limits of Performance',
+  sub:'At high Mach numbers, compressibility rewrites the aerodynamic rules. A cascade of effects narrows the usable flight envelope until, at coffin corner, it closes to a point.',
+  nodes:[
+    {id:'mach',  label:'MACH NUMBER',    sub:'V / a — speed relative to sound',r:1,c:'2/4',
+     formula:'M = \\frac{V}{a} = \\frac{V}{\\sqrt{\\gamma R T}}',
+     detail:'The ratio of aircraft speed to the local speed of sound. As altitude increases, temperature and therefore the speed of sound decrease — so the same TAS gives a higher Mach number at altitude. This is why high-altitude cruise introduces compressibility effects not seen at low altitude.',
+     mistake:'Assuming the speed of sound is constant. It varies with temperature, making Mach number dependent on altitude even at the same TAS.',
+     interview:'An aircraft flies at 250 kt TAS at sea level and at FL350. Compare the Mach numbers and explain why they differ.'},
+    {id:'mcrit', label:'CRITICAL MACH',  sub:'first local M = 1.0',    r:2,c:'1/3',
+     detail:'The freestream Mach where the local airflow over the wing first reaches M = 1.0. Because the wing accelerates airflow, Mcrit < 1.0 for all subsonic aircraft. Wing sweep and supercritical sections are both designed to push Mcrit as high as possible.',
+     mistake:'Confusing Mcrit with Mdd (drag divergence). Mcrit is when local M = 1 is first reached; Mdd is when drag increases rapidly — they differ by ~0.05 Mach.',
+     interview:'How does wing sweep delay the critical Mach number, and what is the geometric reason?'},
+    {id:'wavedrag',label:'WAVE DRAG',    sub:'irreversible shock loss',  r:2,c:'3/5',
+     detail:'Energy lost irreversibly to shock-wave compression. Unlike induced or parasite drag, wave drag cannot be recovered. It is why supersonic flight is thermodynamically expensive and why the area rule (Whitcomb) was such a significant discovery.',
+     mistake:'Treating wave drag as an on/off phenomenon at M = 1. It begins well below M = 1 wherever locally supersonic flow exists.',
+     interview:'Explain the area rule and how it reduces wave drag on a transonic design.'},
+    {id:'mdd',   label:'DRAG DIVERGENCE',sub:'Mcrit + ~0.05',           r:3,c:'1/3', tag:'work',
+     formula:'\\left.\\frac{dC_D}{dM}\\right|_{M_{DD}} = 0.1',
+     detail:'The Mach where wave drag increases sharply — the practical upper speed limit for efficient flight. MMO is set below Mdd with a safety margin. Supercritical airfoils and wing sweep together push Mdd to ~M0.85 for modern transports.',
+     mistake:'Assuming Mdd = MMO. There must be margin between them for handling qualities, gust response, and control effectiveness.',
+     interview:'Why must MMO be set significantly below Mdd, and what happens aerodynamically between MMO and Mdd?'},
+    {id:'buffet', label:'BUFFET',        sub:'shock-induced separation', r:3,c:'3/5',
+     detail:'High-speed buffet is caused by oscillating separated flow behind the shock wave. It defines the top of the cruise speed envelope. Low-speed (stall) buffet defines the bottom. The usable cruise band lies between them — and at high altitude, this band narrows.',
+     mistake:'Assuming buffet is only a high-speed phenomenon. Stall buffet and shock buffet are both "buffet" but arise from completely different physics.',
+     interview:'What is the difference between low-speed stall buffet and high-speed shock buffet? What causes each?'},
+    {id:'coffin', label:'COFFIN CORNER', sub:'Vstall = Vbuffet',        r:4,c:'2/4', tag:'work',
+     detail:'At extreme altitude, the IAS for stall rises (thinner air demands higher speed to generate the same lift force) while the IAS for buffet onset falls (compressibility effects arrive at lower IAS). These two speeds converge. At coffin corner altitude, flying any speed causes either stall or buffet — there is no safe speed.',
+     mistake:'Thinking coffin corner is far above normal operations. For high-flying transport aircraft, it may be only a few thousand feet above FL410.',
+     interview:'Explain coffin corner from first principles using both the low-speed and high-speed performance limits simultaneously.'},
+  ],
+  edges:[['mach','mcrit'],['mach','wavedrag'],['mcrit','mdd'],['wavedrag','mdd'],['mdd','buffet'],['buffet','coffin',1],['mcrit','buffet']]
+},
+];
+
+/* ===== RENDER ===== */
+const layersEl = document.getElementById('layers');
+const navdots = document.getElementById('navdots');
+
+LAYERS.forEach((layer, idx) => {
+  const section = document.createElement('section');
+  section.className = 'layer';
+  section.id = layer.id;
+  section.innerHTML = `
+    <div class="layer-head">
+      <div class="layer-num">${layer.num}</div>
+      <div><h2>${layer.title}</h2><div class="layer-sub">${layer.sub}</div></div>
+    </div>
+    <div class="schematic"><svg class="connectors"></svg><div class="grid"></div></div>
+  `;
+  layersEl.appendChild(section);
+
+  const grid = section.querySelector('.grid');
+
+  layer.nodes.forEach((n, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'node';
+    btn.dataset.id = n.id;
+    btn.style.gridRow = n.r;
+    btn.style.gridColumn = n.c;
+    btn.style.setProperty('--i', i % 6);
+
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'label';
+    if(n.math && window.katex){
+      try{ katex.render(n.math, labelSpan, {throwOnError:false}); }
+      catch(e){ labelSpan.textContent = n.label; }
+    } else {
+      labelSpan.textContent = n.label;
+    }
+
+    const subSpan = document.createElement('span');
+    subSpan.className = 'sub';
+    subSpan.textContent = n.sub;
+
+    btn.appendChild(labelSpan);
+    btn.appendChild(subSpan);
+
+    if(n.tag === 'work'){
+      const dot = document.createElement('span');
+      dot.className = 'workdot';
+      btn.appendChild(dot);
+    }
+    grid.appendChild(btn);
+  });
+
+  // Detail panel
+  const detail = document.createElement('div');
+  detail.className = 'detail';
+  detail.id = layer.id + '-detail';
+  grid.appendChild(detail);
+
+  grid.addEventListener('click', (e) => {
+    const btn = e.target.closest('.node');
+    if(!btn) return;
+    const n = layer.nodes.find(x => x.id === btn.dataset.id);
+    const wasActive = btn.classList.contains('active');
+    grid.querySelectorAll('.node').forEach(b => b.classList.remove('active','lit'));
+    section.querySelectorAll('svg.connectors path').forEach(p => p.classList.remove('lit'));
+    if(wasActive){ detail.classList.remove('show'); return; }
+    btn.classList.add('active');
+
+    const connectedIds = new Set();
+    layer.edges.forEach(([fromId, toId]) => {
+      if(fromId === n.id) connectedIds.add(toId);
+      if(toId === n.id) connectedIds.add(fromId);
+    });
+    connectedIds.forEach(id => {
+      const el = section.querySelector(`.node[data-id="${id}"]`);
+      if(el) el.classList.add('lit');
+    });
+    section.querySelectorAll('svg.connectors path').forEach(p => {
+      if(p.dataset.from === n.id || p.dataset.to === n.id) p.classList.add('lit');
+    });
+
+    // Build detail content
+    const titleHTML = `<div class="dtitle">${n.label} — ${n.sub}</div>`;
+    const formulaHTML = n.formula
+      ? `<div class="formula" id="formula-${n.id}"></div>`
+      : '';
+    const workBadge = n.tag === 'work'
+      ? '<span class="workbadge">connects to operational / certification work</span>'
+      : '';
+    const extraHTML = (n.mistake || n.interview) ? `
+      <div class="extra">
+        ${n.mistake ? `<div class="extra-item"><b>Common Mistake</b>${n.mistake}</div>` : ''}
+        ${n.interview ? `<div class="extra-item"><b>Interview Q</b>${n.interview}</div>` : ''}
+      </div>` : '';
+
+    detail.innerHTML = titleHTML + formulaHTML + `<p>${n.detail}</p>` + workBadge + extraHTML;
+
+    if(n.formula && window.katex){
+      const formulaEl = detail.querySelector(`#formula-${n.id}`);
+      if(formulaEl){
+        try{ katex.render(n.formula, formulaEl, {throwOnError:false, displayMode:true}); }
+        catch(e){ formulaEl.textContent = n.formula; }
+      }
+    }
+
+    detail.classList.add('show');
+  });
+
+  // Nav dot
+  const dot = document.createElement('button');
+  dot.setAttribute('aria-label', layer.title);
+  dot.addEventListener('click', () => section.scrollIntoView({behavior:'smooth'}));
+  navdots.appendChild(dot);
+});
+
+/* ===== CONNECTOR LINES ===== */
+function drawConnectors(){
+  LAYERS.forEach(layer => {
+    const section = document.getElementById(layer.id);
+    if(window.innerWidth <= 780) return;
+    const svg = section.querySelector('svg.connectors');
+    const grid = section.querySelector('.grid');
+    const gridRect = grid.getBoundingClientRect();
+    svg.setAttribute('viewBox',`0 0 ${gridRect.width} ${gridRect.height}`);
+    svg.innerHTML = '';
+
+    layer.edges.forEach(([fromId, toId, applied]) => {
+      const fromEl = section.querySelector(`[data-id="${fromId}"]`);
+      const toEl = section.querySelector(`[data-id="${toId}"]`);
+      if(!fromEl || !toEl) return;
+      const fr = fromEl.getBoundingClientRect();
+      const tr = toEl.getBoundingClientRect();
+      const x1 = fr.left + fr.width/2 - gridRect.left;
+      const y1 = fr.bottom - gridRect.top;
+      const x2 = tr.left + tr.width/2 - gridRect.left;
+      const y2 = tr.top - gridRect.top;
+      const midY = y1 + (y2 - y1) / 2;
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d',`M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`);
+      path.setAttribute('fill','none');
+      path.setAttribute('stroke', applied ? '#6EF5A5' : '#7DF9FF');
+      path.setAttribute('stroke-width','1.4');
+      path.setAttribute('opacity', applied ? '0.5' : '0.4');
+      path.dataset.from = fromId;
+      path.dataset.to = toId;
+      if(applied) path.classList.add('applied');
+      svg.appendChild(path);
+    });
+  });
+}
+window.addEventListener('load', drawConnectors);
+window.addEventListener('resize', () => requestAnimationFrame(drawConnectors));
+
+/* ===== ACTIVE NAV DOT ===== */
+const sections = LAYERS.map(l => document.getElementById(l.id));
+const dots = navdots.querySelectorAll('button');
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if(entry.isIntersecting){
+      const idx = sections.indexOf(entry.target);
+      dots.forEach(d => d.classList.remove('active'));
+      if(dots[idx]) dots[idx].classList.add('active');
+    }
+  });
+},{threshold:0.35});
+sections.forEach(s => io.observe(s));
+
+/* ===== ENERGY CANVAS HERO ===== */
+(function(){
+  const canvas = document.getElementById('energyCanvas');
+  const ctx = canvas.getContext('2d');
+  const hudPE = document.getElementById('hudPE');
+  const hudKE = document.getElementById('hudKE');
+  const hudTE = document.getElementById('hudTE');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2;
+
+  let mx = 0.5, my = 0.5;
+  let tmx = 0.5, tmy = 0.5;
+
+  canvas.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect();
+    tmx = (e.clientX - r.left) / r.width;
+    tmy = (e.clientY - r.top) / r.height;
+  });
+  canvas.addEventListener('mouseleave', () => { tmx = 0.5; tmy = 0.5; });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches[0];
+    tmx = (t.clientX - r.left) / r.width;
+    tmy = (t.clientY - r.top) / r.height;
+  }, {passive:false});
+
+  function lerp(a,b,t){ return a+(b-a)*t; }
+
+  // Axis tick values
+  const TICKS = 8;
+
+  function draw(){
+    mx = lerp(mx, tmx, 0.055);
+    my = lerp(my, tmy, 0.055);
+
+    // PE = altitude (top = high), KE = speed (right = high)
+    const pe = 1 - my;   // 0..1
+    const ke = mx;        // 0..1
+    const te = (pe + ke) / 2;
+
+    ctx.clearRect(0, 0, W, H);
+
+    const R = 130; // outer radius of the chart area
+    const padding = 44;
+    const chartW = W - padding*2;
+    const chartH = H - padding*2;
+
+    // Draw grid
+    for(let i = 0; i <= TICKS; i++){
+      const x = padding + (i/TICKS) * chartW;
+      const y = padding + (i/TICKS) * chartH;
+      ctx.beginPath();
+      ctx.moveTo(x, padding); ctx.lineTo(x, H - padding);
+      ctx.strokeStyle = 'rgba(28,51,73,0.8)'; ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(padding, y); ctx.lineTo(W - padding, y);
+      ctx.stroke();
+    }
+
+    // Axes
+    ctx.beginPath();
+    ctx.moveTo(padding, padding); ctx.lineTo(padding, H - padding);
+    ctx.strokeStyle = 'rgba(93,174,255,0.4)'; ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(padding, H - padding); ctx.lineTo(W - padding, H - padding);
+    ctx.strokeStyle = 'rgba(95,184,92,0.4)'; ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Iso-energy lines (PE + KE = const)
+    for(let e = 0.2; e <= 1.8; e += 0.2){
+      const alpha = e === 1.0 ? 0.3 : 0.1;
+      ctx.beginPath();
+      // pe + ke = e → ke = e - pe
+      // pe goes 0..1 on y axis, ke goes 0..1 on x axis
+      const x0 = padding + Math.max(0, e-1) * chartW;
+      const y0 = padding + (1 - Math.min(1, e)) * chartH;
+      const x1 = padding + Math.min(1, e) * chartW;
+      const y1 = padding + (1 - Math.max(0, e-1)) * chartH;
+      ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
+      ctx.strokeStyle = e === 1.0 ? `rgba(242,169,59,${alpha})` : `rgba(125,249,255,${alpha})`;
+      ctx.lineWidth = e === 1.0 ? 1.5 : 0.8;
+      ctx.stroke();
+    }
+
+    // Current state trajectory (constant total energy line highlight)
+    ctx.beginPath();
+    const ex0 = padding + Math.max(0, te*2-1) * chartW;
+    const ey0 = padding + (1 - Math.min(1, te*2)) * chartH;
+    const ex1 = padding + Math.min(1, te*2) * chartW;
+    const ey1 = padding + (1 - Math.max(0, te*2-1)) * chartH;
+    ctx.moveTo(ex0, ey0); ctx.lineTo(ex1, ey1);
+    ctx.strokeStyle = `rgba(242,169,59,0.55)`;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5,4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Shaded region — current PE/KE balance
+    const stateX = padding + ke * chartW;
+    const stateY = padding + (1 - pe) * chartH;
+
+    // Vertical line from state to axis
+    ctx.beginPath();
+    ctx.moveTo(stateX, stateY); ctx.lineTo(stateX, H - padding);
+    ctx.strokeStyle = 'rgba(95,184,92,0.5)'; ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Horizontal line from state to axis
+    ctx.beginPath();
+    ctx.moveTo(stateX, stateY); ctx.lineTo(padding, stateY);
+    ctx.strokeStyle = 'rgba(93,174,255,0.5)'; ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Fill quadrant (KE fill — horizontal)
+    ctx.fillStyle = 'rgba(95,184,92,0.06)';
+    ctx.fillRect(padding, stateY, stateX - padding, H - padding - stateY);
+
+    // Fill quadrant (PE fill — vertical)
+    ctx.fillStyle = 'rgba(93,174,255,0.06)';
+    ctx.fillRect(padding, padding, stateX - padding, stateY - padding);
+
+    // State dot
+    ctx.beginPath();
+    ctx.arc(stateX, stateY, 8, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(242,169,59,0.15)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(stateX, stateY, 5, 0, Math.PI*2);
+    ctx.fillStyle = '#F2A93B';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(stateX, stateY, 2.5, 0, Math.PI*2);
+    ctx.fillStyle = '#EAF7FF';
+    ctx.fill();
+
+    // Axis labels
+    ctx.font = '600 11px IBM Plex Mono, monospace';
+    ctx.fillStyle = 'rgba(93,174,255,0.7)';
+    ctx.textAlign = 'center';
+    ctx.save();
+    ctx.translate(14, cy);
+    ctx.rotate(-Math.PI/2);
+    ctx.fillText('POTENTIAL ENERGY (Altitude)', 0, 0);
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(95,184,92,0.7)';
+    ctx.textAlign = 'center';
+    ctx.fillText('KINETIC ENERGY (Speed)', cx, H - 10);
+
+    // PE & KE readouts
+    ctx.font = '600 13px IBM Plex Mono, monospace';
+    ctx.fillStyle = 'rgba(93,174,255,0.85)';
+    ctx.textAlign = 'left';
+    ctx.fillText('PE ' + Math.round(pe*100) + '%', padding + 6, stateY - 8);
+
+    ctx.fillStyle = 'rgba(95,184,92,0.85)';
+    ctx.textAlign = 'center';
+    ctx.fillText('KE ' + Math.round(ke*100) + '%', stateX, H - padding - 8);
+
+    // Update HUD
+    if(hudPE) hudPE.textContent = Math.round(pe*100);
+    if(hudKE) hudKE.textContent = Math.round(ke*100);
+    if(hudTE) hudTE.textContent = Math.round(te*200);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+/* ===== SPOTLIGHT ===== */
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(!reduceMotion){
+  window.addEventListener('mousemove', e => {
+    document.documentElement.style.setProperty('--mx', e.clientX+'px');
+    document.documentElement.style.setProperty('--my', e.clientY+'px');
+  }, {passive:true});
+}
+
+/* ===== STARFIELD ===== */
+(function(){
+  const canvas = document.getElementById('starfield');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let w, h, particles=[];
+  const COUNT = reduceMotion ? 0 : 70;
+  let pageVisible = true;
+  document.addEventListener('visibilitychange', () => { pageVisible = document.visibilityState==='visible'; });
+
+  function resize(){ w=canvas.width=window.innerWidth; h=canvas.height=window.innerHeight; }
+  function init(){
+    resize();
+    particles = Array.from({length:COUNT}, () => ({
+      x:Math.random()*w, y:Math.random()*h,
+      depth:.3+Math.random()*.7, r:.6+Math.random()*1.4,
+      tw:Math.random()*Math.PI*2,
+      vx:(Math.random()-.5)*.06, vy:(Math.random()-.5)*.06
+    }));
+  }
+  let mouseX=-9999, mouseY=-9999;
+  window.addEventListener('mousemove', e=>{ mouseX=e.clientX; mouseY=e.clientY; }, {passive:true});
+
+  function frame(t){
+    if(pageVisible && COUNT){
+      ctx.clearRect(0,0,w,h);
+      particles.forEach(p => {
+        p.x+=p.vx*p.depth; p.y+=p.vy*p.depth;
+        if(p.x<0)p.x=w; if(p.x>w)p.x=0;
+        if(p.y<0)p.y=h; if(p.y>h)p.y=0;
+        const dx=p.x-mouseX, dy=p.y-mouseY;
+        const distSq=dx*dx+dy*dy;
+        if(distSq<6000){ const d=Math.sqrt(distSq)||1; p.x+=dx/d*.6; p.y+=dy/d*.6; }
+        const tw=.5+Math.sin(t*.001+p.tw)*.5;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r*p.depth, 0, Math.PI*2);
+        ctx.fillStyle=`rgba(125,249,255,${(.15+tw*.35)*p.depth})`;
+        ctx.fill();
+      });
+    }
+    requestAnimationFrame(frame);
+  }
+  init();
+  window.addEventListener('resize', () => requestAnimationFrame(init));
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
